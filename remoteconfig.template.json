@@ -1,0 +1,24 @@
+{
+  "parameters": {
+    "phiCloudFallback": {
+      "defaultValue": { "value": "false" },
+      "description": "Must stay false. AirlockMD refuses to send identifiers to the cloud even if this is flipped.",
+      "valueType": "BOOLEAN"
+    },
+    "injectionPolicy": {
+      "defaultValue": { "value": "block" },
+      "description": "block requires a person to strip hidden instructions before release. redact_and_warn strips them and warns.",
+      "valueType": "STRING"
+    },
+    "scanStrictness": {
+      "defaultValue": { "value": "high" },
+      "description": "high also holds SUSPICIOUS documents for review. standard holds only INJECTION_DETECTED.",
+      "valueType": "STRING"
+    },
+    "policyVersion": {
+      "defaultValue": { "value": "2026.11.1" },
+      "description": "Label stored on the audit ledger and stamped into the tokenized payload.",
+      "valueType": "STRING"
+    }
+  }
+}

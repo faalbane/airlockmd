@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAudit(data) {
+      return data.keys().hasOnly([
+          'timestamp',
+          'step',
+          'mode',
+          'inferenceSource',
+          'entityCounts',
+          'injectionBlocked',
+          'policyVersion',
+          'payloadHash'
+        ])
+        && data.timestamp is timestamp
+        && data.step in ['detect', 'scan', 'release', 'appeal', 'leak_check', 'handout']
+        && data.mode in ['ONLY_ON_DEVICE', 'ONLY_IN_CLOUD', 'PREFER_ON_DEVICE', 'LOCAL_REHEARSAL', 'NONE']
+        && data.inferenceSource in ['ON_DEVICE', 'IN_CLOUD', 'LOCAL_REHEARSAL', 'BLOCKED']
+        && data.injectionBlocked is bool
+        && data.policyVersion is string
+        && data.policyVersion.size() < 40
+        && data.payloadHash is string
+        && data.payloadHash.size() < 80
+        && data.entityCounts is map
+        && data.entityCounts.keys().hasOnly([
+          'name',
+          'geographic_subdivision',
+          'date',
+          'telephone',
+          'fax',
+          'email',
+          'ssn',
+          'mrn',
+          'health_plan_id',
+          'account_number',
+          'certificate_license',
+          'vehicle_id',
+          'device_id',
+          'url',
+          'ip',
+          'biometric',
+          'face_photo',
+          'other_unique_id'
+        ]);
+    }
+
+    match /audits/{userId}/events/{eventId} {
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && isAudit(request.resource.data);
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

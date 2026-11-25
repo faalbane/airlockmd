@@ -1,0 +1,17 @@
+node_modules
+dist
+.firebase
+.env
+.env.local
+.env.*.local
+firebase-config.json
+public/firebase-config.json
+*.log
+.DS_Store
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+.vscode
+coverage
+*.tsbuildinfo

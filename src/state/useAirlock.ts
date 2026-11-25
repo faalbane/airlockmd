@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
@@ -88,8 +86,40 @@ type LooseResponse = {
 const CHAR_CAP = ON_DEVICE_TOKEN_LIMIT * 4;
 
 function errorText(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
+  const message = error instanceof Error && error.message ? error.message : "";
+  if (/429|exceeded your current quota|rate-limit|billing details/i.test(message)) {
+    return "The cloud model is temporarily unavailable because of a quota limit. You can still tokenize, scan, and review a local draft.";
+  }
+  if (/AI: Error fetching from|firebasevertexai|AI\/fetch-error/i.test(message)) {
+    return "The cloud model could not be reached. You can still tokenize, scan, and review a local draft. Nothing extra was sent.";
+  }
+  if (message) return message;
   return "Something went wrong. Nothing extra was sent.";
+}
+
+function authErrorText(error: unknown): string {
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: string }).code) : "";
+  const message = error instanceof Error ? error.message : "";
+  const haystack = `${code} ${message}`;
+  if (/operation-not-allowed/i.test(haystack)) {
+    return "That sign-in method is not available. Use the demo email and password from the Devpost submission.";
+  }
+  if (/invalid-credential|wrong-password|user-not-found|invalid-email|invalid-login/i.test(haystack)) {
+    return "That email and password did not match the demo account. Use the credentials from the Devpost submission.";
+  }
+  if (/too-many-requests/i.test(haystack)) {
+    return "Too many sign-in attempts. Wait a moment and try again.";
+  }
+  if (/network-request-failed/i.test(haystack)) {
+    return "The sign-in request could not reach the server. Check your connection and try again.";
+  }
+  if (/popup-blocked|popup-closed|cancelled-popup/i.test(haystack)) {
+    return "The sign-in window was closed or blocked.";
+  }
+  if (/^Firebase: Error \(auth\//i.test(message) || /auth\//.test(haystack)) {
+    return "Sign-in did not complete. Use the demo email and password from the Devpost submission.";
+  }
+  return errorText(error);
 }
 
 function looseResponse(result: { response: { text: () => string } }): LooseResponse {
@@ -225,6 +255,7 @@ export function useAirlock() {
     setTokenNote(null);
     setError(null);
     setNotice(null);
+    setCalls([]);
   }
 
   function loadFixture(id: string) {
@@ -323,7 +354,7 @@ export function useAirlock() {
       await writeAudit(activeHandle, activeUser.uid, recordBody);
       setLedger((current) => current.map((item) => (item.id === id ? { ...item, saved: true } : item)));
     } catch {
-      setNotice("The local ledger updated. Cloud Firestore did not accept this entry.");
+      setNotice("The local ledger updated. The server did not accept this entry.");
     }
   }
 
@@ -338,7 +369,7 @@ export function useAirlock() {
     const active = handleRef.current;
     if (!active) {
       setNano("unavailable");
-      setError("Airlock sealed: the local stage cannot run. Firebase config is missing, so Gemini Nano cannot start. Rehearsal stays on this device.");
+      setError("Airlock sealed: the on-device model cannot start in this session. Notes and images stay on this device.");
       return;
     }
     setNano("downloading");
@@ -651,21 +682,33 @@ export function useAirlock() {
       let rawSource: string | undefined;
       let nextGrounding: GroundingView | null = null;
       if (active) {
-        mode = "ONLY_IN_CLOUD";
-        let result: { response: { text: () => string } };
         try {
-          result = await active.models.appeal.generateContent(prompt);
-        } catch {
-          result = await active.models.appealText.generateContent(prompt);
+          mode = "ONLY_IN_CLOUD";
+          let result: { response: { text: () => string } };
+          try {
+            result = await active.models.appeal.generateContent(prompt);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "";
+            if (/429|quota|rate-limit|billing details/i.test(message)) throw error;
+            result = await active.models.appealText.generateContent(prompt);
+          }
+          const response = looseResponse(result);
+          rawSource = response.inferenceSource;
+          badge = normalizeInferenceSource(rawSource, "BLOCKED");
+          if (badge !== "IN_CLOUD") {
+            throw new AirlockBlocked("The appeal did not stay in the cloud. The payload was tokens only, and it was not retried on device.");
+          }
+          nextDraft = parseAppeal(response.text());
+          nextGrounding = readGrounding(response);
+        } catch (error) {
+          if (error instanceof AirlockBlocked) throw error;
+          nextDraft = rehearsalAppeal(prepared.payload);
+          mode = "LOCAL_REHEARSAL";
+          badge = "LOCAL_REHEARSAL";
+          rawSource = undefined;
+          nextGrounding = null;
+          setNotice("The cloud draft is temporarily unavailable. This letter is a local draft from the tokenized payload. Identifiers never left this device.");
         }
-        const response = looseResponse(result);
-        rawSource = response.inferenceSource;
-        badge = normalizeInferenceSource(rawSource, "BLOCKED");
-        if (badge !== "IN_CLOUD") {
-          throw new AirlockBlocked("The appeal did not stay in the cloud. The payload was tokens only, and it was not retried on device.");
-        }
-        nextDraft = parseAppeal(response.text());
-        nextGrounding = readGrounding(response);
       } else {
         nextDraft = rehearsalAppeal(prepared.payload);
       }
@@ -730,7 +773,7 @@ export function useAirlock() {
           nanoState = "failed";
           mode = "LOCAL_REHEARSAL";
           badge = "LOCAL_REHEARSAL";
-          setError("Nano leak check did not run. The regex and known-value check still ran on the cloud text.");
+          setError("The on-device identifier check did not run. The automatic identifier check still ran on the draft.");
         }
       }
       const unique: LeakCheck["findings"] = [];
@@ -772,18 +815,27 @@ export function useAirlock() {
       let badge: InferenceBadge = "LOCAL_REHEARSAL";
       let rawSource: string | undefined;
       if (active) {
-        mode = "PREFER_ON_DEVICE";
-        const onProgress = (value: number) => setProgress(Math.round(value * 10000) / 100);
         try {
-          await active.models.handout.initializeDeviceModel(onProgress);
-        } catch {
-          setNotice("On-device handout init did not finish. Prefer-on-device may use the cloud, and the input is still tokenized.");
+          mode = "PREFER_ON_DEVICE";
+          const onProgress = (value: number) => setProgress(Math.round(value * 10000) / 100);
+          try {
+            await active.models.handout.initializeDeviceModel(onProgress);
+          } catch {
+            setNotice("The on-device handout model did not start. The handout still uses only the tokenized letter.");
+          }
+          const result = await active.models.handout.generateContent(prompt);
+          const response = looseResponse(result);
+          rawSource = response.inferenceSource;
+          badge = normalizeInferenceSource(rawSource, "IN_CLOUD");
+          tokenized = response.text().trim();
+        } catch (error) {
+          if (error instanceof AirlockBlocked) throw error;
+          tokenized = rehearsalHandout(draft.letter);
+          mode = "LOCAL_REHEARSAL";
+          badge = "LOCAL_REHEARSAL";
+          rawSource = undefined;
+          setNotice("The cloud handout is temporarily unavailable. This handout is a local draft from the tokenized letter. Identifiers never left this device.");
         }
-        const result = await active.models.handout.generateContent(prompt);
-        const response = looseResponse(result);
-        rawSource = response.inferenceSource;
-        badge = normalizeInferenceSource(rawSource, "IN_CLOUD");
-        tokenized = response.text().trim();
       } else {
         tokenized = rehearsalHandout(draft.letter);
       }
@@ -830,17 +882,7 @@ export function useAirlock() {
     try {
       await signInWithEmailAndPassword(handle.auth, email.trim(), password);
     } catch (error) {
-      setAuthError(errorText(error));
-    }
-  }
-
-  async function signInGoogle() {
-    if (!handle) return;
-    setAuthError(null);
-    try {
-      await signInWithPopup(handle.auth, new GoogleAuthProvider());
-    } catch (error) {
-      setAuthError(errorText(error));
+      setAuthError(authErrorText(error));
     }
   }
 
@@ -913,7 +955,6 @@ export function useAirlock() {
     copyLetter,
     printLetter,
     signInEmail,
-    signInGoogle,
     signOutUser,
   };
 }

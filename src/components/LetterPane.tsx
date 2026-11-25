@@ -1,4 +1,5 @@
 import { lockedLeftovers } from "../logic/payload";
+import { rehydrate } from "../logic/rehydrate";
 import type { AirlockController } from "../state/useAirlock";
 import { ModeBadge, SourceBadge } from "./Badges";
 
@@ -7,6 +8,9 @@ export function LetterPane({ airlock }: { airlock: AirlockController }) {
   const lockedBlocked = locked.length > 0 && !airlock.exceptionConfirmed;
   const showRestored = Boolean(airlock.restored);
   const letter = showRestored ? airlock.restored : airlock.draft?.letter ?? "";
+  const title = showRestored && airlock.draft && airlock.prepared
+    ? rehydrate(airlock.draft.title, airlock.prepared.tokenMap)
+    : airlock.draft?.title ?? "";
   const cloudBlocked = Boolean(airlock.handle && !airlock.online);
 
   return (
@@ -53,12 +57,12 @@ export function LetterPane({ airlock }: { airlock: AirlockController }) {
 
       {airlock.draft ? (
         <article className="letter" data-testid="letter">
-          <p className="letter-kicker">{showRestored ? "Names restored on this laptop" : "Still tokenized"}</p>
-          <h3>{airlock.draft.title}</h3>
+          <p className="letter-kicker">{showRestored ? "Names restored on this device" : "Still tokenized"}</p>
+          <h3>{title}</h3>
           <pre>{letter}</pre>
         </article>
       ) : (
-        <p className="fine">The cloud model, when configured, receives the outbound JSON only. This rehearsal writes a local template until then.</p>
+        <p className="fine">The cloud draft receives only the tokenized payload, never raw identifiers. Until a cloud draft runs, this panel shows a local letter you can review.</p>
       )}
 
       {airlock.grounding?.html ? (
@@ -86,12 +90,12 @@ export function LetterPane({ airlock }: { airlock: AirlockController }) {
           <strong>{airlock.leak.ok ? "Leak check passed" : "Leak check held the letter"}</strong>
           <p>
             {airlock.leak.nano === "not_run"
-              ? "Regex and known-value check ran on the cloud text before names were restored. Nano did not run."
+              ? "An automatic identifier check ran on the draft before names were restored. The on-device model check was skipped."
               : airlock.leak.nano === "clean"
-                ? "Regex and the on-device check both passed on the tokenized cloud text."
+                ? "The automatic identifier check and the on-device check both passed on the tokenized draft."
                 : airlock.leak.nano === "failed"
-                  ? "Nano leak check did not run. The regex and known-value check still ran."
-                  : "The on-device check flagged the tokenized cloud text."}
+                  ? "The on-device identifier check did not run. The automatic identifier check still ran on the draft."
+                  : "The on-device check flagged the tokenized draft."}
           </p>
           {airlock.leak.findings.map((finding) => (
             <p key={finding.detail + finding.value}>{finding.detail}</p>
@@ -116,7 +120,7 @@ export function LetterPane({ airlock }: { airlock: AirlockController }) {
 
       {airlock.handout ? (
         <article className="letter handout" data-testid="handout-letter">
-          <p className="letter-kicker">Handout restored on this laptop</p>
+          <p className="letter-kicker">Handout restored on this device</p>
           <pre>{airlock.handout}</pre>
           <details>
             <summary>Handout before names were restored</summary>

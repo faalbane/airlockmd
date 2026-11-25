@@ -33,4 +33,13 @@ describe("rehydrate", () => {
     const tokenized = "Patient [PATIENT_1], SSN [SSN_1].";
     expect(rehydrate(tokenized, map)).toBe(original);
   });
+
+  it("restores tokens whose prefix contains an underscore", () => {
+    const planMap: TokenMap = {
+      ...map,
+      "[PLAN_ID_1]": { type: "health_plan_id", text: "NW-441290" },
+    };
+    expect(rehydrate("member [PLAN_ID_1] for [PATIENT_1]", planMap)).toBe("member NW-441290 for Avery Quinn");
+    expect(unknownTokens("member [PLAN_ID_1]", planMap)).toEqual([]);
+  });
 });

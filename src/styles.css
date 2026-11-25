@@ -190,7 +190,18 @@ h3 { font-size: 16px; margin-bottom: 8px; }
   padding: 10px;
   margin-bottom: 12px;
 }
-.drop input { max-width: 100%; }
+.drop {
+  position: relative;
+  cursor: pointer;
+}
+.drop input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
 .preview { margin: 0 0 12px; }
 .preview img { border-radius: 12px; border: 1px solid var(--line); max-height: 280px; object-fit: contain; background: white; }
 .doc {
@@ -322,6 +333,28 @@ pre.json {
   .panes, .split, .cases, .add-span { grid-template-columns: 1fr; }
   .pane { max-height: none; }
 }
+
+@media (max-width: 700px) {
+  .top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 14px 8px;
+  }
+  .pills, .top-actions { width: 100%; }
+  .top-actions button { flex: 1; }
+  .pill { max-width: 100%; overflow-wrap: anywhere; }
+  .banner { overflow-wrap: anywhere; margin-left: 14px; margin-right: 14px; }
+  .stepper, .panes { padding-left: 14px; padding-right: 14px; }
+  .ledger, .limitations { margin-left: 14px; margin-right: 14px; }
+  .card { padding: 20px 16px; }
+  .card h1 { font-size: 26px; }
+  .match strong { font-size: 42px; }
+  .ledger { overflow-x: auto; }
+  .actions { position: sticky; top: 0; z-index: 2; background: var(--panel); padding: 8px 0; }
+  .ledger header { flex-direction: column; align-items: flex-start; }
+}
+
 
 @media print {
   body * { visibility: hidden; }

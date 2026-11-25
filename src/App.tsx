@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { DocumentPane } from "./components/DocumentPane";
 import { InspectorPane } from "./components/InspectorPane";
 import { LetterPane } from "./components/LetterPane";
+import { rehydrate } from "./logic/rehydrate";
 import { useAirlock, type Phase } from "./state/useAirlock";
 
 const STEPS: { id: Phase; label: string }[] = [
@@ -56,9 +57,9 @@ export function App() {
                 ? `Downloading ${airlock.progress ?? 0}%`
                 : "Airlock sealed"}
           </span>
-          <span className="pill">phiCloudFallback {airlock.policy.phiCloudFallback ? "requested" : "false"}</span>
+          <span className="pill">{airlock.policy.phiCloudFallback ? "Cloud identifier fallback blocked" : "Identifiers stay on this device"}</span>
           <span className="pill">{airlock.online ? "Online" : "Offline"}</span>
-          <span className="pill">{airlock.appCheckEnabled ? "App Check on" : "App Check not configured"}</span>
+          <span className="pill">{airlock.appCheckEnabled ? "App Check on" : "App Check off"}</span>
           <span className="pill">{airlock.user?.email ?? "Local demo"}</span>
         </div>
         <div className="top-actions">
@@ -83,17 +84,17 @@ export function App() {
           {" "}
           {airlock.handle
             ? "Raw notes and images are not sent to the cloud. A released tokenized payload can still be drafted."
-            : "Firebase config is missing, so this session cannot reach Gemini Nano or cloud Gemini. The rehearsal below stays on this device until you release tokens, and the letter is a local template."}
+            : "The on-device model is not available in this session. Notes and images stay on this device. You can still review tokens and draft a local letter."}
         </p>
       ) : (
         <p className="banner ok" data-testid="ready-banner">
-          On-device model ready. Identifier passes, the integrity scan, and the leak check stay on this laptop.
+          On-device model ready. Identifier passes, the integrity scan, and the leak check stay on this device.
         </p>
       )}
 
       {airlock.policy.phiCloudFallback ? (
         <p className="banner bad">
-          Remote Config requested phiCloudFallback. AirlockMD ignores it and still refuses to send identifiers.
+          A remote policy asked to send identifiers to the cloud. AirlockMD ignores that request and keeps identifiers on this device.
         </p>
       ) : null}
       {!airlock.online ? (
@@ -125,7 +126,7 @@ export function App() {
           <p>Counts, mode, and inference source only. No notes, images, token maps, or names.</p>
         </header>
         {airlock.ledger.length === 0 ? (
-          <p className="fine">Entries appear as you move through a case. Firestore receives the same fields when you are signed in.</p>
+          <p className="fine">Entries appear as you move through a case. Signed-in sessions also save these fields to the server.</p>
         ) : (
           <table data-testid="ledger">
             <thead>
@@ -150,7 +151,7 @@ export function App() {
                   <td>{row.injectionBlocked ? "yes" : "no"}</td>
                   <td>{row.policyVersion}</td>
                   <td title={row.payloadHash}>{row.payloadHash.slice(0, 12)}</td>
-                  <td>{row.saved ? "Firestore" : "This tab"}</td>
+                  <td>{row.saved ? "Server" : "This tab"}</td>
                 </tr>
               ))}
             </tbody>
@@ -168,7 +169,7 @@ export function App() {
 
       <div id="print-sheet" aria-hidden="true">
         <p>AirlockMD draft for staff review. Synthetic demo.</p>
-        <h1>{airlock.draft?.title}</h1>
+        <h1>{airlock.restored && airlock.draft && airlock.prepared ? rehydrate(airlock.draft.title, airlock.prepared.tokenMap) : airlock.draft?.title}</h1>
         <pre>{airlock.restored}</pre>
       </div>
     </div>
@@ -176,14 +177,14 @@ export function App() {
 }
 
 function SignIn({ airlock }: { airlock: ReturnType<typeof useAirlock> }) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("judge@airlockmd.example");
   const [password, setPassword] = useState("");
   return (
-    <div className="signin">
+    <div className="signin" data-testid="signin">
       <div className="card">
         <p className="kicker">AirlockMD</p>
         <h1>Sign in to the workspace</h1>
-        <p>Use the judge account created in Firebase Auth. Do not put that password in the repo. Suggested email: judge@airlockmd.example</p>
+        <p>Judges: sign in with the demo credentials provided in the Devpost submission. Everything in this workspace uses synthetic patient data.</p>
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -192,16 +193,15 @@ function SignIn({ airlock }: { airlock: ReturnType<typeof useAirlock> }) {
         >
           <label>
             Email
-            <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input type="email" autoComplete="username" data-testid="signin-email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           </label>
           <label>
             Password
-            <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+            <input type="password" autoComplete="current-password" data-testid="signin-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           </label>
-          {airlock.authError ? <p className="banner bad">{airlock.authError}</p> : null}
-          <button type="submit" className="primary">Sign in</button>
+          {airlock.authError ? <p className="banner bad" data-testid="signin-error">{airlock.authError}</p> : null}
+          <button type="submit" className="primary" data-testid="signin-submit">Sign in</button>
         </form>
-        <button type="button" className="ghost" onClick={() => void airlock.signInGoogle()}>Continue with Google</button>
       </div>
     </div>
   );

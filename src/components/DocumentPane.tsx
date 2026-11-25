@@ -30,6 +30,14 @@ function labelFor(type: string): string {
   return TYPE_LABEL[type] ?? type;
 }
 
+
+function scanLabel(verdict: string): string {
+  if (verdict === "INJECTION_DETECTED") return "Hidden instruction found";
+  if (verdict === "SUSPICIOUS") return "Suspicious instruction found";
+  if (verdict === "SAFE") return "No hidden instruction found";
+  return verdict;
+}
+
 export function DocumentPane({ airlock }: { airlock: AirlockController }) {
   const [selection, setSelection] = useState("");
   const [spanType, setSpanType] = useState<IdentifierType>("name");
@@ -40,7 +48,7 @@ export function DocumentPane({ airlock }: { airlock: AirlockController }) {
     <section className="pane laptop" aria-label="Source document">
       <header className="pane-head">
         <div>
-          <p className="kicker">Your laptop</p>
+          <p className="kicker">Your device</p>
           <h2>Source</h2>
         </div>
         <span className="synthetic">Synthetic patient data</span>
@@ -60,6 +68,54 @@ export function DocumentPane({ airlock }: { airlock: AirlockController }) {
             <span>{fixture.summary}</span>
           </button>
         ))}
+      </div>
+
+      <div className="actions">
+        <button type="button" data-testid="detect" onClick={() => void airlock.detect()} disabled={airlock.busy || airlock.judge}>
+          {airlock.judge ? "Already tokenized" : "Find identifiers"}
+        </button>
+        <button type="button" data-testid="scan" onClick={() => void airlock.scanDoc()} disabled={airlock.busy || !airlock.sourceText.trim()}>
+          Scan for hidden instructions
+        </button>
+      </div>
+
+      {airlock.scan ? (
+        <div className={`scan verdict-${airlock.scan.verdict}`} data-testid="scan-result">
+          <div className="scan-top">
+            <strong>{scanLabel(airlock.scan.verdict)}</strong>
+          </div>
+          {airlock.scan.spans.length === 0 ? (
+            <p>No hidden instruction found by the local screen.</p>
+          ) : (
+            airlock.scan.spans.map((span) => (
+              <blockquote key={span.text} data-testid="injection-quote">
+                <p>{span.text}</p>
+                <footer>{span.reason}</footer>
+              </blockquote>
+            ))
+          )}
+          {airlock.held ? (
+            <button type="button" className="danger" data-testid="strip-injection" onClick={airlock.stripInstructions}>
+              Strip hidden instructions
+            </button>
+          ) : null}
+          {airlock.stripped && airlock.scan.verdict !== "SAFE" ? (
+            <p className="fine">Those lines will be removed from the outbound text. They stay on this device.</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="route-row">
+        {airlock.calls
+          .filter((call) => call.step === "Identifier pass" || call.step === "Integrity scan")
+          .slice(0, 2)
+          .map((call) => (
+            <span key={call.id} className="route">
+              {call.step}
+              <ModeBadge mode={call.mode} />
+              <SourceBadge source={call.inferenceSource} raw={call.rawSource} />
+            </span>
+          ))}
       </div>
 
       <label
@@ -175,53 +231,6 @@ export function DocumentPane({ airlock }: { airlock: AirlockController }) {
         </form>
       </div>
 
-      {airlock.scan ? (
-        <div className={`scan verdict-${airlock.scan.verdict}`} data-testid="scan-result">
-          <div className="scan-top">
-            <strong>{airlock.scan.verdict}</strong>
-          </div>
-          {airlock.scan.spans.length === 0 ? (
-            <p>No hidden instruction found by the local screen.</p>
-          ) : (
-            airlock.scan.spans.map((span) => (
-              <blockquote key={span.text} data-testid="injection-quote">
-                <p>{span.text}</p>
-                <footer>{span.reason}</footer>
-              </blockquote>
-            ))
-          )}
-          {airlock.held ? (
-            <button type="button" className="danger" data-testid="strip-injection" onClick={airlock.stripInstructions}>
-              Strip hidden instructions
-            </button>
-          ) : null}
-          {airlock.stripped && airlock.scan.verdict !== "SAFE" ? (
-            <p className="fine">Those lines will be removed from the outbound text. They stay on this laptop.</p>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="route-row">
-        {airlock.calls
-          .filter((call) => call.step === "Identifier pass" || call.step === "Integrity scan")
-          .slice(0, 2)
-          .map((call) => (
-            <span key={call.id} className="route">
-              {call.step}
-              <ModeBadge mode={call.mode} />
-              <SourceBadge source={call.inferenceSource} raw={call.rawSource} />
-            </span>
-          ))}
-      </div>
-
-      <div className="actions">
-        <button type="button" data-testid="detect" onClick={() => void airlock.detect()} disabled={airlock.busy || airlock.judge}>
-          {airlock.judge ? "Already tokenized" : "Find identifiers"}
-        </button>
-        <button type="button" data-testid="scan" onClick={() => void airlock.scanDoc()} disabled={airlock.busy || !airlock.sourceText.trim()}>
-          Scan for hidden instructions
-        </button>
-      </div>
     </section>
   );
 }

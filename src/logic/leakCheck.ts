@@ -2,7 +2,7 @@ import type { LeakCheck, LeakFinding, TokenMap } from "../types";
 import { findRegexSpans } from "./regexNet";
 import { secretsFromMap } from "./tokenizer";
 
-const TOKEN_PATTERN = /\[[A-Z][A-Z0-9]*_\d+\]/g;
+const TOKEN_PATTERN = /\[[A-Z][A-Z0-9_]*_\d+\]/g;
 
 /**
  * Inspect cloud output before names are restored.
@@ -21,7 +21,7 @@ export function checkLeaks(cloudText: string, tokenMap: TokenMap, releasedText =
     if (haystack.includes(value.toLowerCase())) {
       findings.push({
         kind: "known_identifier",
-        detail: `Cloud output contains the raw value held for ${token}.`,
+        detail: `The draft contains the raw value held for ${token}.`,
         value,
       });
     }
@@ -35,7 +35,7 @@ export function checkLeaks(cloudText: string, tokenMap: TokenMap, releasedText =
     if (value.length >= 3 && released.includes(value.toLowerCase())) continue;
     findings.push({
       kind: "pattern",
-      detail: `Cloud output matches a ${span.type} pattern that is not a token.`,
+      detail: `The draft matches a ${span.type} pattern that is not a token.`,
       value,
     });
   }

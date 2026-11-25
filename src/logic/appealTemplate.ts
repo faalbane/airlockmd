@@ -27,8 +27,6 @@ export function rehearsalAppeal(payload: OutboundPayload): AppealDraft {
     "",
     "The summary describes conservative care and a remaining functional limit. Please review the request against the plan's published medical policy.",
     "",
-    "Bracketed tokens are placeholders. The laptop restores names only after this draft returns. Do not try to guess the missing identifiers.",
-    "",
     "Thank you,",
     "Prior authorization team",
     "Synthetic clinic demo",
@@ -38,7 +36,7 @@ export function rehearsalAppeal(payload: OutboundPayload): AppealDraft {
     title: `Request for reconsideration for ${who}`,
     letter,
     citedFacts: [
-      "Rehearsal draft: Google Search grounding did not run. With Firebase AI Logic configured, this panel lists live citations and the required Search suggestions.",
+      "Local draft: live policy citations are not included in this letter. After a cloud draft, this panel lists the sources the model used.",
     ],
   };
 }

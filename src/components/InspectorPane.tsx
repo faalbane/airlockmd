@@ -68,7 +68,7 @@ export function InspectorPane({ airlock }: { airlock: AirlockController }) {
 
       <div className="split">
         <div>
-          <h3>Stays on this laptop</h3>
+          <h3>Stays on this device</h3>
           {map && Object.keys(map).length > 0 ? (
             <ul className="map" data-testid="token-map">
               {Object.entries(map).map(([token, entry]) => (
@@ -79,7 +79,7 @@ export function InspectorPane({ airlock }: { airlock: AirlockController }) {
               ))}
             </ul>
           ) : (
-            <p className="fine">The token map appears here after identifiers are released. It is not written to Firestore.</p>
+            <p className="fine">The token map appears here after identifiers are released. It stays on this device and is not saved to the server.</p>
           )}
           {airlock.imageUrl ? <p className="fine">The image bytes stay in this tab.</p> : null}
         </div>
@@ -126,7 +126,7 @@ export function InspectorPane({ airlock }: { airlock: AirlockController }) {
           checked={airlock.confirmed}
           onChange={(event) => airlock.setConfirmed(event.target.checked)}
         />
-        I reviewed every span. Tokenized items stay on this laptop. Items I removed may appear in the outbound payload.
+        I reviewed every span. Tokenized items stay on this device. Items I removed may appear in the outbound payload.
       </label>
 
       <button

@@ -15,7 +15,7 @@ export function SourceBadge({
   raw?: string;
 }) {
   return (
-    <span className={`badge source-${source.toLowerCase()}`} title={raw ? `inferenceSource: ${raw}` : "No inferenceSource returned"}>
+    <span className={`badge source-${source.toLowerCase()}`} title={raw ? `Model source: ${raw}` : "No model source reported"}>
       {SOURCE_LABEL[source]}
     </span>
   );

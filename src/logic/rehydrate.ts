@@ -1,6 +1,6 @@
 import type { TokenMap } from "../types";
 
-const TOKEN_PATTERN = /\[([A-Z][A-Z0-9]*_\d+)\]/g;
+const TOKEN_PATTERN = /\[([A-Z][A-Z0-9_]*_\d+)\]/g;
 
 /**
  * Swap tokens for the original values in one pass.
